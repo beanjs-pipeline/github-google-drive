@@ -10,7 +10,7 @@ const folder = actions.getInput('folder', { required: true });
 /** Local path to the file/folder to upload */
 const target = actions.getInput('target', { required: true });
 /** Optional name for the zipped file */
-const name = actions.getInput('name', { required: false });
+const name = actions.getInput('name', { required: true });
 /** Link to the Drive folder */
 const link = 'link';
 
@@ -20,26 +20,31 @@ const auth = new google.auth.JWT(credentialsJSON.client_email, null, credentials
 const drive = google.drive({ version: 'v3', auth });
 
 const driveLink = `https://drive.google.com/drive/folders/${folder}`
-let filename = target.split('/').pop();
+// const targetPath = target.split('/').pop();
 
 async function main() {
   actions.setOutput(link, driveLink);
+  const dateNow=new Date(Date.now());
+  const zipFileName=`${name}-${dateNow.toISOString().split('T')[0]}.zip`
 
-  if (fs.lstatSync(target).isDirectory()){
-    filename = `${name || target}.zip`
+  actions.info(`Folder detected in ${target}`)
+  actions.info(`Zipping ${target}...`)
 
-    actions.info(`Folder detected in ${target}`)
-    actions.info(`Zipping ${target}...`)
-
-    zipDirectory(target, filename)
-      .then(() => uploadToDrive())
-      .catch(e => {
-        actions.error('Zip failed');
-        throw e;
-      });
+  let zipPromise=null
+  if(fs.lstatSync(target).isDirectory()){
+    zipPromise=zipDirectory(target,zipFileName)
+  }else{
+    zipPromise=zipFile(target,zipFileName)
   }
-  else
-    uploadToDrive();
+
+  if(zipPromise){
+    zipPromise
+      .then(()=>uploadToDrive(zipFileName))
+      .catch((e)=>{
+        actions.error('Zip failed');
+        throw(e)
+      })
+  }
 }
 
 /**
@@ -66,18 +71,39 @@ function zipDirectory(source, out) {
   });
 }
 
+function zipFile(file,out){
+  const archive = archiver('zip', { zlib: { level: 9 }});
+  const stream = fs.createWriteStream(out);
+
+  return new Promise((resolve,reject)=>{
+    const fileName = file.split('/').pop();
+    
+    archive
+      .file(file,{name:fileName})
+      .on("error",(e)=>reject(e))
+      .pipe(stream)
+
+    stream.on('close',()=>{
+      actions.info(`Folder successfully zipped: ${archive.pointer()} total bytes written`);
+      return resolve();
+    })
+
+    archive.finalize()
+  })
+}
+
 /**
  * Uploads the file to Google Drive
  */
-function uploadToDrive() {
+function uploadToDrive(zipFile) {
   actions.info('Uploading file to Goole Drive...');
   drive.files.create({
     requestBody: {
-      name: filename,
+      name: zipFile,
       parents: [folder]
     },
     media: {
-      body: fs.createReadStream(`${name || target}${fs.lstatSync(target).isDirectory() ? '.zip' : ''}`)
+      body: fs.createReadStream(zipFile)
     }
   }).then(() => actions.info('File uploaded successfully'))
     .catch(e => {
