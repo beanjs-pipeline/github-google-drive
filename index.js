@@ -24,8 +24,9 @@ const driveLink = `https://drive.google.com/drive/folders/${folder}`
 
 async function main() {
   actions.setOutput(link, driveLink);
-  const dateNow=new Date(Date.now());
-  const zipFileName=`${name}-${dateNow.toISOString().split('T')[0]}-${dateNow.getTime()}.zip`
+  const nowMs=Date.now();
+  const dateNow=new Date(nowMs);
+  const zipFileName=`${name}-${dateNow.toISOString().split('T')[0]}-${nowMs}.zip`
 
   actions.info(`Folder detected in ${target}`)
   actions.info(`Zipping ${target}...`)
