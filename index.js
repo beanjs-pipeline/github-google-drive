@@ -26,7 +26,7 @@ async function main() {
   actions.setOutput(link, driveLink);
   const nowMs=Date.now();
   const dateNow=new Date(nowMs);
-  const zipFileName=`${name}-${dateNow.toISOString().split('T')[0]}-${nowMs}.zip`
+  const zipFileName=`${name}-${dateNow.toISOString().split('T')[0]}-${parseInt(nowMs)}.zip`
 
   actions.info(`Folder detected in ${target}`)
   actions.info(`Zipping ${target}...`)
